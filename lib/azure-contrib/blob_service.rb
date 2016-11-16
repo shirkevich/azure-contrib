@@ -4,12 +4,22 @@
 require 'azure/blob/blob_service'
 require 'celluloid'
 require 'timeout'
+require 'stringio'
 
-class ::File
+module ChunkHelper
   def each_chunk(chunk_size=2**20)
     yield read(chunk_size) until eof?
   end
 end
+
+class ::StringIO
+  include ChunkHelper
+end
+
+class ::File
+  include ChunkHelper
+end
+
 
 # The maximum size for a block blob is 200 GB, and a block blob can include no more than 50,000 blocks.
   # http://msdn.microsoft.com/en-us/library/azure/ee691964.aspx
@@ -58,8 +68,7 @@ module Azure
     def create_block_blob_with_chunking(container, blob, content_or_filepath, options={})
       chunking = options.delete(:chunking)
       if chunking
-        filepath = content_or_filepath
-        block_list = upload_chunks(container, blob, filepath, options)
+        block_list = upload_chunks(container, blob, content_or_filepath, options)
 
         unless block_list
           puts "EMPTY BLOCKLIST!"
@@ -78,12 +87,23 @@ module Azure
 
     # The maximum size for a block blob is 200 GB, and a block blob can include no more than 50,000 blocks.
     # http://msdn.microsoft.com/en-us/library/azure/ee691964.aspx
-    def upload_chunks(container, blob, filepath, options = {})
+    def upload_chunks(container, blob, content_or_filepath, options = {})
       counter = 1
       futures = []
       pool    = BlockActor.pool(size: 10, args: [self, container, blob, options])
 
-      open(filepath, 'rb') do |f|
+      if (content_or_filepath =~ /\x00/)
+        # contains null characters - has to be content, avoid File.file check that will fail
+        classType = ::StringIO
+      elsif File.file?(content_or_filepath)
+        # filename
+        classType = ::File
+      else
+        # string
+        classType = ::StringIO
+      end
+
+      classType.open(content_or_filepath) do |f|
         f.each_chunk() {|chunk|
           block_id = counter.to_s.rjust(5, '0')
           futures << pool.future.upload(block_id, chunk)
