@@ -103,16 +103,28 @@ module Azure
         classType = ::StringIO
       end
 
+      block_list = []
       classType.open(content_or_filepath) do |f|
-        f.each_chunk() {|chunk|
+        until f.eof?
           block_id = counter.to_s.rjust(5, '0')
-          futures << pool.future.upload(block_id, chunk)
+          futures << pool.future.upload(block_id, f.read(2**20))
           counter += 1
-        }
+          temp = []
+          futures.each do |f|
+            if f.ready?
+              block_list << f.value
+            else
+              temp << f
+            end
+            GC.start
+          end
+          futures = temp
+        end
       end
 
-      block_list = futures.map(&:value)
+      block_list += futures.map(&:value)
       pool.terminate
+      futures = nil
       return block_list
     end
 
