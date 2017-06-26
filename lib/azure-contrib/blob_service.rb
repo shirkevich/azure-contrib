@@ -116,7 +116,7 @@ module Azure
             else
               temp << f
             end
-            GC.start
+            # GC.start
           end
           futures = temp
         end
