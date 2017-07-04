@@ -75,7 +75,7 @@ module Azure
           return false
         end
 
-        logger.info("Done uploading, committing ...", blocks: #{block_list.size})
+        logger.info("Done uploading, committing ...", blocks: block_list.size)
         options[:blob_content_type] = options[:content_type]
         commit_blob_blocks(container, blob, block_list, options)
         logger.info "Uploading done"
