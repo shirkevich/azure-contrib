@@ -32,27 +32,26 @@ class BlockActor
   end
 
   def upload(block_id, chunk, retries = 0)
+    logger = @options[:logger]
+
     Timeout::timeout(@options[:timeout] || 30){
-      log "Uploading block #{block_id}"
+      logger.debug "Uploading block #{block_id}"
       options = @options.dup
       options[:content_md5] = Base64.strict_encode64(Digest::MD5.digest(chunk))
       content_md5 = @service.create_blob_block(@container, @blob, block_id, chunk, options)
-      log "Done uploading block #{block_id} #{content_md5}"
+      logger.debug "Done uploading block #{block_id} #{content_md5}"
       [block_id, :uncommitted]
     }
   rescue Timeout::Error, Azure::Core::Error => e
-    log "Failed to upload #{block_id}: #{e.class} #{e.message}"
+    logger.debug "Failed to upload #{block_id}: #{e.class} #{e.message}"
     if retries < 5
-      log "Retrying upload (#{retries})"
+      logger.debug "Retrying upload (#{retries})"
       upload(block_id, chunk, retries += 1)
     else
-      log "Complete failure to upload #{retries} retries"
+      logger.error "Complete failure to upload #{retries} retries"
     end
   end
 
-  def log(message)
-    puts message
-  end
 end
 
 module Azure
@@ -67,18 +66,19 @@ module Azure
 
     def create_block_blob_with_chunking(container, blob, content_or_filepath, options={})
       chunking = options.delete(:chunking)
+      logger = options[:logger]
       if chunking
         block_list = upload_chunks(container, blob, content_or_filepath, options)
 
         unless block_list
-          puts "EMPTY BLOCKLIST!"
+          logger.error "EMPTY BLOCKLIST!"
           return false
         end
 
-        puts "Done uploading #{block_list.size} blocks, committing ..."
+        logger.info("Done uploading, committing ...", blocks: #{block_list.size})
         options[:blob_content_type] = options[:content_type]
         commit_blob_blocks(container, blob, block_list, options)
-        puts "done."
+        logger.info "Uploading done"
       else
         content = content_or_filepath
         create_block_blob_without_chunking(container, blob, content, options)
