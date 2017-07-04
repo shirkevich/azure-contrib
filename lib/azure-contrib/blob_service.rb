@@ -66,7 +66,7 @@ module Azure
 
     def create_block_blob_with_chunking(container, blob, content_or_filepath, options={})
       chunking = options.delete(:chunking)
-      logger = options[:logger]
+      logger = options.delete(:logger)
       if chunking
         block_list = upload_chunks(container, blob, content_or_filepath, options)
 
