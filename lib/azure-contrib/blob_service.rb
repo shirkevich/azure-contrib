@@ -65,8 +65,9 @@ module Azure
     # alias_method :get_blob, :get_blob_with_chunking
 
     def create_block_blob_with_chunking(container, blob, content_or_filepath, options={})
-      chunking = options.delete(:chunking)
-      logger = options.delete(:logger)
+      opt = options.dup
+      chunking = opt.delete(:chunking)
+      logger = opt.delete(:logger)
       if chunking
         block_list = upload_chunks(container, blob, content_or_filepath, options)
 
@@ -77,11 +78,11 @@ module Azure
 
         logger.info("Done uploading, committing ...", blocks: block_list.size)
         options[:blob_content_type] = options[:content_type]
-        commit_blob_blocks(container, blob, block_list, options)
+        commit_blob_blocks(container, blob, block_list, opt)
         logger.info "Uploading done"
       else
         content = content_or_filepath
-        create_block_blob_without_chunking(container, blob, content, options)
+        create_block_blob_without_chunking(container, blob, content, opt)
       end
     end
 
