@@ -78,7 +78,6 @@ module Azure
 
         logger.info("Done uploading, committing ...", blocks: block_list.size)
         logger.debug("Block list order", order: block_list.map{|x,y| x})
-        logger.debug("Block list fixed", order: block_list.sort_by{|x,y| x}.map{|x,y| x})
         options[:blob_content_type] = options[:content_type]
         commit_blob_blocks(container, blob, block_list, opt)
         logger.info "Uploading done"
@@ -128,7 +127,8 @@ module Azure
       block_list += futures.map(&:value)
       pool.terminate
       futures = nil
-      return block_list
+      # block list must be sorted, otherwise blob will be broken
+      return block_list.sort_by{|x,y| x}
     end
 
     alias_method :create_block_blob_without_chunking, :create_block_blob
